@@ -1,0 +1,20 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+
+  - name: auth-service
+    url: http://auth-service:5000
+    routes:
+      - name: auth-routes
+        paths:
+          - /auth
+        strip_path: false
+
+  - name: business-logic-service
+    url: http://business-logic-service:5002
+    routes:
+      - name: api-routes
+        paths:
+          - /api
+        strip_path: false

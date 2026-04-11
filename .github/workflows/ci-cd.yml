@@ -1,0 +1,42 @@
+name: Deploy to Docker Swarm
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:   # permite și trigger manual din GitHub UI
+
+jobs:
+  deploy:
+    name: Deploy stack pe Swarm
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy config files to Swarm manager
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SWARM_HOST }}
+          username: ${{ secrets.SWARM_USER }}
+          key: ${{ secrets.SWARM_SSH_KEY }}
+          source: "docker-stack.yml,kong/kong.yml,monitoring/prometheus.yml"
+          target: "/home/${{ secrets.SWARM_USER }}/bookreview"
+
+      - name: Deploy stack to Docker Swarm
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SWARM_HOST }}
+          username: ${{ secrets.SWARM_USER }}
+          key: ${{ secrets.SWARM_SSH_KEY }}
+          script: |
+            cd /home/${{ secrets.SWARM_USER }}/bookreview
+            export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+            export IMAGE_TAG=latest
+            docker stack deploy \
+              --with-registry-auth \
+              --compose-file docker-stack.yml \
+              bookreview
+            echo "=== Servicii active ==="
+            docker stack services bookreview
