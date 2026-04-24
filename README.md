@@ -25,6 +25,18 @@ Browser
 
 ## Rulare locală (Docker Compose)
 
+Cele trei microservicii sunt incluse ca **git submodules** (repo-uri separate). La clonare folosește `--recurse-submodules`:
+
+```bash
+git clone --recurse-submodules -b initial_try https://github.com/andreimitea30/bookreview.git
+cd bookreview
+```
+
+Dacă ai clonat deja fără submodules:
+```bash
+git submodule update --init --recursive
+```
+
 ```bash
 # Pornire
 docker compose up --build -d

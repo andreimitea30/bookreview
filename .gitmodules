@@ -1,0 +1,12 @@
+[submodule "auth-service"]
+	path = auth-service
+	url = https://github.com/andreimitea30/bookreview-auth
+	branch = initial_try
+[submodule "io-service"]
+	path = io-service
+	url = https://github.com/andreimitea30/bookreview-io
+	branch = initial_try
+[submodule "business-logic-service"]
+	path = business-logic-service
+	url = https://github.com/andreimitea30/bookreview-business
+	branch = initial_try
