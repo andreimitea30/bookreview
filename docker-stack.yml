@@ -6,6 +6,12 @@ configs:
     file: ./kong/kong.yml
   prometheus_config:
     file: ./monitoring/prometheus.yml
+  grafana_datasource:
+    file: ./monitoring/grafana/provisioning/datasources/prometheus.yml
+  grafana_dashboard_provider:
+    file: ./monitoring/grafana/provisioning/dashboards/dashboards.yml
+  grafana_dashboard_json:
+    file: ./monitoring/grafana/provisioning/dashboards/bookreview.json
 
 services:
 
@@ -13,7 +19,7 @@ services:
   # Baze de date pe manager pentru persistență (volumele sunt locale per nod)
 
   auth-db:
-    image: ${DOCKER_USERNAME:-andreimitea30}/bookreview-auth-db:${IMAGE_TAG:-latest}
+    image: ${DOCKER_USERNAME:-biancasc}/bookreview-auth-db:${IMAGE_TAG:-latest}
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
       MYSQL_DATABASE: auth_db
@@ -21,6 +27,12 @@ services:
       - auth-db-data:/var/lib/mysql
     networks:
       - auth-network
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-u", "root", "-prootpassword", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     deploy:
       replicas: 1
       placement:
@@ -32,7 +44,7 @@ services:
         max_attempts: 3
 
   books-db:
-    image: ${DOCKER_USERNAME:-andreimitea30}/bookreview-books-db:${IMAGE_TAG:-latest}
+    image: ${DOCKER_USERNAME:-biancasc}/bookreview-books-db:${IMAGE_TAG:-latest}
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
       MYSQL_DATABASE: books_db
@@ -40,6 +52,12 @@ services:
       - books-db-data:/var/lib/mysql
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-u", "root", "-prootpassword", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     deploy:
       replicas: 1
       placement:
@@ -70,7 +88,7 @@ services:
   # ── Microservices (pe workers) ─────────────────────────────────────────────
 
   auth-service:
-    image: ${DOCKER_USERNAME:-andreimitea30}/bookreview-auth:${IMAGE_TAG:-latest}
+    image: ${DOCKER_USERNAME:-biancasc}/bookreview-auth:${IMAGE_TAG:-latest}
     environment:
       DB_HOST: auth-db
       DB_PORT: "3306"
@@ -93,11 +111,11 @@ services:
         failure_action: rollback
       restart_policy:
         condition: on-failure
-        delay: 5s
-        max_attempts: 3
+        delay: 10s
+        max_attempts: 10
 
   io-service:
-    image: ${DOCKER_USERNAME:-andreimitea30}/bookreview-io:${IMAGE_TAG:-latest}
+    image: ${DOCKER_USERNAME:-biancasc}/bookreview-io:${IMAGE_TAG:-latest}
     environment:
       DB_HOST: books-db
       DB_PORT: "3306"
@@ -118,11 +136,11 @@ services:
         failure_action: rollback
       restart_policy:
         condition: on-failure
-        delay: 5s
-        max_attempts: 3
+        delay: 10s
+        max_attempts: 10
 
   business-logic-service:
-    image: ${DOCKER_USERNAME:-andreimitea30}/bookreview-business:${IMAGE_TAG:-latest}
+    image: ${DOCKER_USERNAME:-biancasc}/bookreview-business:${IMAGE_TAG:-latest}
     environment:
       AUTH_SERVICE_URL: http://auth-service:5000
       IO_SERVICE_URL: http://io-service:5001
@@ -204,6 +222,13 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: admin
     volumes:
       - grafana-data:/var/lib/grafana
+    configs:
+      - source: grafana_datasource
+        target: /etc/grafana/provisioning/datasources/prometheus.yml
+      - source: grafana_dashboard_provider
+        target: /etc/grafana/provisioning/dashboards/dashboards.yml
+      - source: grafana_dashboard_json
+        target: /etc/grafana/provisioning/dashboards/bookreview.json
     networks:
       - monitoring-network
     deploy:

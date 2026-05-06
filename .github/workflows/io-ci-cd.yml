@@ -6,7 +6,7 @@ name: IO Service - Build & Push
 on:
   push:
     branches:
-      - main
+      - initial_try
 
 jobs:
   build-and-push:

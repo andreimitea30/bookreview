@@ -123,6 +123,20 @@ services:
       - auth-service
       - business-logic-service
 
+  kong-config:
+    image: curlimages/curl:latest
+    depends_on:
+      - kong
+    networks:
+      - gateway-network
+    restart: on-failure
+    entrypoint: >
+      sh -c "sleep 10 &&
+             curl -X POST http://kong:8001/config
+             -F 'config=@/kong/kong.yml'"
+    volumes:
+      - ./kong/kong.yml:/kong/kong.yml
+
   # ── Monitoring ─────────────────────────────────────────────────────────────
 
   prometheus:
@@ -147,6 +161,7 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: admin
     volumes:
       - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
     networks:
       - monitoring-network
     depends_on:

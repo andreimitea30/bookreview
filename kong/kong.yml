@@ -18,3 +18,18 @@ services:
         paths:
           - /api
         strip_path: false
+
+plugins:
+  - name: rate-limiting
+    service: auth-service
+    config:
+      minute: 30
+      policy: local
+      limit_by: ip
+
+  - name: rate-limiting
+    service: business-logic-service
+    config:
+      minute: 100
+      policy: local
+      limit_by: ip
