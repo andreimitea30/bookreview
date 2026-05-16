@@ -1,7 +1,5 @@
 services:
 
-  # ── Databases ──────────────────────────────────────────────────────────────
-
   auth-db:
     image: mariadb:11
     container_name: auth-db
@@ -38,8 +36,6 @@ services:
       retries: 20
       start_period: 30s
 
-  # ── DB Admin ───────────────────────────────────────────────────────────────
-
   adminer:
     image: adminer:4
     container_name: adminer
@@ -52,8 +48,6 @@ services:
       - auth-db
       - books-db
 
-  # ── Microservices ──────────────────────────────────────────────────────────
-
   auth-service:
     build: ./auth-service
     container_name: auth-service
@@ -63,7 +57,7 @@ services:
       DB_USER: root
       DB_PASSWORD: rootpassword
       DB_NAME: auth_db
-      JWT_SECRET: changeme_in_production
+      JWT_SECRET: secret_key
     networks:
       - auth-network
       - gateway-network
@@ -99,8 +93,6 @@ services:
       - auth-service
       - io-service
 
-  # ── Kong API Gateway ───────────────────────────────────────────────────────
-
   kong:
     image: kong:3.6
     container_name: kong
@@ -113,8 +105,8 @@ services:
       KONG_ADMIN_ERROR_LOG: /dev/stderr
       KONG_ADMIN_LISTEN: "0.0.0.0:8001"
     ports:
-      - "8000:8000"   # public proxy
-      - "8001:8001"   # admin API (local only)
+      - "8000:8000"
+      - "8001:8001"
     volumes:
       - ./kong/kong.yml:/kong/kong.yml
     networks:
@@ -136,8 +128,6 @@ services:
              -F 'config=@/kong/kong.yml'"
     volumes:
       - ./kong/kong.yml:/kong/kong.yml
-
-  # ── Monitoring ─────────────────────────────────────────────────────────────
 
   prometheus:
     image: prom/prometheus:v2.51.2
@@ -167,8 +157,6 @@ services:
     depends_on:
       - prometheus
 
-  # ── Portainer ──────────────────────────────────────────────────────────────
-
   portainer:
     image: portainer/portainer-ce:2.20.3
     container_name: portainer
@@ -180,8 +168,6 @@ services:
     networks:
       - monitoring-network
 
-# ── Networks ───────────────────────────────────────────────────────────────
-
 networks:
   auth-network:
     driver: bridge
@@ -191,8 +177,6 @@ networks:
     driver: bridge
   monitoring-network:
     driver: bridge
-
-# ── Volumes ────────────────────────────────────────────────────────────────
 
 volumes:
   auth-db-data:

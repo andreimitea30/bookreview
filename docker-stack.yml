@@ -1,6 +1,5 @@
 version: '3.8'
 
-# ── Docker Configs (fișiere distribuite în cluster) ────────────────────────
 configs:
   kong_config:
     file: ./kong/kong.yml
@@ -14,9 +13,6 @@ configs:
     file: ./monitoring/grafana/provisioning/dashboards/bookreview.json
 
 services:
-
-  # ── Databases ──────────────────────────────────────────────────────────────
-  # Baze de date pe manager pentru persistență (volumele sunt locale per nod)
 
   auth-db:
     image: ${DOCKER_USERNAME:-biancasc}/bookreview-auth-db:${IMAGE_TAG:-latest}
@@ -68,8 +64,6 @@ services:
         delay: 10s
         max_attempts: 3
 
-  # ── DB Admin ───────────────────────────────────────────────────────────────
-
   adminer:
     image: adminer:4
     ports:
@@ -85,8 +79,6 @@ services:
       restart_policy:
         condition: on-failure
 
-  # ── Microservices (pe workers) ─────────────────────────────────────────────
-
   auth-service:
     image: ${DOCKER_USERNAME:-biancasc}/bookreview-auth:${IMAGE_TAG:-latest}
     environment:
@@ -95,7 +87,7 @@ services:
       DB_USER: root
       DB_PASSWORD: rootpassword
       DB_NAME: auth_db
-      JWT_SECRET: changeme_in_production
+      JWT_SECRET: secret_key
     networks:
       - auth-network
       - gateway-network
@@ -148,7 +140,7 @@ services:
       - app-network
       - gateway-network
     deploy:
-      replicas: 2                    # scalat pe 2 instanțe
+      replicas: 2
       placement:
         constraints:
           - node.role == worker
@@ -161,8 +153,6 @@ services:
         condition: on-failure
         delay: 5s
         max_attempts: 3
-
-  # ── Kong API Gateway ───────────────────────────────────────────────────────
 
   kong:
     image: kong:3.6
@@ -189,8 +179,6 @@ services:
           - node.role == manager
       restart_policy:
         condition: on-failure
-
-  # ── Monitoring ─────────────────────────────────────────────────────────────
 
   prometheus:
     image: prom/prometheus:v2.51.2
@@ -239,8 +227,6 @@ services:
       restart_policy:
         condition: on-failure
 
-  # ── Portainer ──────────────────────────────────────────────────────────────
-
   portainer:
     image: portainer/portainer-ce:2.20.3
     ports:
@@ -258,8 +244,6 @@ services:
       restart_policy:
         condition: on-failure
 
-# ── Networks (overlay pentru Swarm) ───────────────────────────────────────
-
 networks:
   auth-network:
     driver: overlay
@@ -273,8 +257,6 @@ networks:
   monitoring-network:
     driver: overlay
     attachable: true
-
-# ── Volumes ────────────────────────────────────────────────────────────────
 
 volumes:
   auth-db-data:

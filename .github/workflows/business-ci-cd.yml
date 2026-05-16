@@ -1,6 +1,3 @@
-# Acest fișier merge în repo-ul: andreimitea30/bookreview-business
-# Calea: .github/workflows/ci-cd.yml
-
 name: Business Logic Service - Build & Push
 
 on:
