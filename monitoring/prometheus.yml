@@ -1,0 +1,18 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'auth-service'
+    static_configs:
+      - targets: ['auth-service:5000']
+    metrics_path: /metrics
+
+  - job_name: 'io-service'
+    static_configs:
+      - targets: ['io-service:5001']
+    metrics_path: /metrics
+
+  - job_name: 'business-logic-service'
+    static_configs:
+      - targets: ['business-logic-service:5002']
+    metrics_path: /metrics

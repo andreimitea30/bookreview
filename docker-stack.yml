@@ -1,0 +1,266 @@
+version: '3.8'
+
+configs:
+  kong_config:
+    file: ./kong/kong.yml
+  prometheus_config:
+    file: ./monitoring/prometheus.yml
+  grafana_datasource:
+    file: ./monitoring/grafana/provisioning/datasources/prometheus.yml
+  grafana_dashboard_provider:
+    file: ./monitoring/grafana/provisioning/dashboards/dashboards.yml
+  grafana_dashboard_json:
+    file: ./monitoring/grafana/provisioning/dashboards/bookreview.json
+
+services:
+
+  auth-db:
+    image: ${DOCKER_USERNAME:-biancasc}/bookreview-auth-db:${IMAGE_TAG:-latest}
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: auth_db
+    volumes:
+      - auth-db-data:/var/lib/mysql
+    networks:
+      - auth-network
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-u", "root", "-prootpassword", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+
+  books-db:
+    image: ${DOCKER_USERNAME:-biancasc}/bookreview-books-db:${IMAGE_TAG:-latest}
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: books_db
+    volumes:
+      - books-db-data:/var/lib/mysql
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-u", "root", "-prootpassword", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+
+  adminer:
+    image: adminer:4
+    ports:
+      - "8080:8080"
+    networks:
+      - auth-network
+      - app-network
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+  auth-service:
+    image: ${DOCKER_USERNAME:-biancasc}/bookreview-auth:${IMAGE_TAG:-latest}
+    environment:
+      DB_HOST: auth-db
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: rootpassword
+      DB_NAME: auth_db
+      JWT_SECRET: secret_key
+    networks:
+      - auth-network
+      - gateway-network
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == worker
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+
+  io-service:
+    image: ${DOCKER_USERNAME:-biancasc}/bookreview-io:${IMAGE_TAG:-latest}
+    environment:
+      DB_HOST: books-db
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: rootpassword
+      DB_NAME: books_db
+    networks:
+      - app-network
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == worker
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+
+  business-logic-service:
+    image: ${DOCKER_USERNAME:-biancasc}/bookreview-business:${IMAGE_TAG:-latest}
+    environment:
+      AUTH_SERVICE_URL: http://auth-service:5000
+      IO_SERVICE_URL: http://io-service:5001
+    networks:
+      - app-network
+      - gateway-network
+    deploy:
+      replicas: 2
+      placement:
+        constraints:
+          - node.role == worker
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
+  kong:
+    image: kong:3.6
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001"
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    configs:
+      - source: kong_config
+        target: /kong/kong.yml
+    networks:
+      - gateway-network
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+  prometheus:
+    image: prom/prometheus:v2.51.2
+    ports:
+      - "9090:9090"
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+    volumes:
+      - prometheus-data:/prometheus
+    networks:
+      - monitoring-network
+      - gateway-network
+      - app-network
+      - auth-network
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    configs:
+      - source: grafana_datasource
+        target: /etc/grafana/provisioning/datasources/prometheus.yml
+      - source: grafana_dashboard_provider
+        target: /etc/grafana/provisioning/dashboards/dashboards.yml
+      - source: grafana_dashboard_json
+        target: /etc/grafana/provisioning/dashboards/bookreview.json
+    networks:
+      - monitoring-network
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+  portainer:
+    image: portainer/portainer-ce:2.20.3
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer-data:/data
+    networks:
+      - monitoring-network
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+networks:
+  auth-network:
+    driver: overlay
+    attachable: true
+  app-network:
+    driver: overlay
+    attachable: true
+  gateway-network:
+    driver: overlay
+    attachable: true
+  monitoring-network:
+    driver: overlay
+    attachable: true
+
+volumes:
+  auth-db-data:
+  books-db-data:
+  prometheus-data:
+  grafana-data:
+  portainer-data:
